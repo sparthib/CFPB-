@@ -1,7 +1,7 @@
 # CFPB-
 Classification of complaints from Consumer Financial Protection Bureau
 
-This is an assignment for my Advanced Data Science course at JHU. 
+This is an assignment for my Advanced Data Science II course at JHSPH. 
 
 Data for this project can be found here https://www.consumerfinance.gov/data-research/consumer-complaints/
 
