@@ -1,0 +1,456 @@
+---
+title: "adv ds hw 2"
+author: "Sowmya"
+date: "12/5/2021"
+output: html_document
+---
+
+```{r setup}
+
+library(tidyverse)
+library(stringr)
+library(tidytext)
+library(skimr)
+library(ggplot2)
+library(tidymodels)
+library(glmnet)
+library(textrecipes)
+library(stopwords)
+```
+
+```{r load data}
+
+data <- read_csv("D:/HW2 ADV DS II/consumer_data.csv")
+```
+
+```{r eda pt1}
+
+skim(data)
+```
+
+Seems likes about half the complaints don't have a consumer narrative, but no
+other column has missing values. 
+
+Since all our features are character vars other than the ID, we don't have any 
+numerical outlier values to examine. We will have to convert dates to date objects 
+from character objects. 
+```{r eda pt2}
+
+head(data$`Consumer complaint narrative`)
+
+```
+
+ 
+The complaints have have xx's to censor personal information as well as dollar 
+amounts indicated in flower brackets. 
+
+
+```{R Q1}
+state_freq <- as.data.frame(table(data$State))
+
+state_freq |> arrange(desc(Freq))
+```
+The state with the most complaints is California. 
+
+The state with second most complaints is Florida. 
+
+
+```{R  Q2}
+
+florida_data <- data |> filter(State == 'FL')
+
+table(florida_data$Product)
+```
+
+From the table, we can see that the number of Student Loan related complaints are 1104. 
+
+Let's create a column that stores the difference in time between date the 
+complaint was received and date the complaint was sent to the company.
+
+We already know from the summary that they are of class 'character'.
+Let's examine whether the columns have timestamps. 
+
+
+```{R Q3 pt1 }
+head(data$`Date received`)
+```
+
+
+```{R Q3 pt2 }
+head(data$`Date sent to company`)
+```
+Looks like they don't have timestamps. 
+
+Let's convert them to dates before we carry out a difference operation. 
+
+```{r convert date received}
+data$date_received = as.Date(data$`Date received`, format = "%m/%d/%y")
+```
+
+```{r convert date sent}
+data$date_sent = as.Date(data$`Date sent to company`, format = "%m/%d/%y")
+```
+
+```{r compute difference}
+data$date_diff <- difftime(data$date_sent, data$date_received, units = 'days')
+
+```
+
+```{R referal data diff}
+referal_data <- data|> filter(`Submitted via` == 'Referral')
+
+mean(referal_data$date_diff)
+```
+
+It takes 4.316 days on average to send a complaint via Referal to the company. 
+```{R web data diff}
+web_data <- data|> filter(`Submitted via` == 'Web')
+
+mean(web_data$date_diff)
+```
+It takes 1.315 days on average to send a complaint via the web to the company.
+
+
+For the 4th question, it makes sense to omit all NA values as the question is 
+about the consumer narrative text. 
+
+While 'type of complain' can be interpreted in many ways, we'll 
+categorize it based on product. 
+
+```{R Q4 }
+
+unique(data$Product)
+
+```
+
+```{R Q4 PT2}
+new_data <- na.omit(data)
+```
+
+
+```{R Q4 PT3 }
+
+student_loan_words <- new_data |> filter(Product == 'Student loan') |>  unnest_tokens(output = word, input = `Consumer complaint narrative` ,token = "words") 
+
+dim(student_loan_words |> filter(word == 'student'))
+```
+'Student' appeared 9002 times in complaints on student loans. 
+
+```{R Q4 PT 4 }
+
+mortgage_words <- new_data |> filter(Product == 'Mortgage') |>  unnest_tokens(output = word, input = `Consumer complaint narrative` ,token = "words") 
+
+dim(mortgage_words |> filter(word == 'student'))
+```
+The word 'student' appeared 296 times in mortgage related complaints. 
+
+
+```{R Q4 PT 5}
+card_words <- new_data |> filter(Product == 'Credit card or prepaid card') |>  unnest_tokens(output = word, input = `Consumer complaint narrative` ,token = "words") 
+
+dim(card_words |> filter(word == 'student'))
+
+```
+
+'Student' appeared 215 times in complaints related to cards. 
+
+```{R Q4 PT 6 }
+vehicle_words <- new_data |> filter(Product == 'Vehicle loan or lease') |>  unnest_tokens(output = word, input = `Consumer complaint narrative` ,token = "words") 
+
+dim(vehicle_words |> filter(word == 'student'))
+
+```
+'Student' appeared 43 times in complaints related to vehicles. 
+
+
+```{R Q5 PT 1 }
+
+student_loan_words = student_loan_words |> anti_join(stop_words)
+
+student_loan_words = student_loan_words[!grepl("xx", student_loan_words$word),]
+
+```
+
+```{R Q5 PT2 }
+student_loan_words |>
+  count(word, sort = TRUE) |> 
+  head(15)
+```
+
+Three most common words for complaints related to student loans: 'loan', 'loans', 'payments'
+```{R Q5 PT 3 }
+
+mortgage_words = mortgage_words |> anti_join(stop_words)
+
+mortgage_words = mortgage_words[!grepl("xx", mortgage_words$word),]
+
+```
+
+```{R Q5 PT 4 }
+mortgage_words |>
+  count(word, sort = TRUE) |> 
+  head(15)
+```
+Three most common words for complaints related to mortgage: 'loan', 'mortgage', 'payment'
+```{R Q5 PT 5  }
+card_words = card_words |> anti_join(stop_words)
+
+card_words = card_words[!grepl("xx", card_words$word),]
+
+
+```
+
+
+```{R Q5 PT 6}
+card_words |>count(word, sort = TRUE) |> head(15)
+```
+Three most common words for complaints related to cards: 'card', 'credit', 'account'
+```{R Q5 PT7 }
+
+vehicle_words = vehicle_words |> anti_join(stop_words)
+
+vehicle_words = vehicle_words[!grepl("xx", vehicle_words$word),]
+
+```
+
+```{R Q5 PT8}
+vehicle_words |>count(word, sort = TRUE) |> head(15)
+```
+Three most common words for complaints related to vehicle loan: 'payment', 'car', 'credit'
+
+We can see that some of the most frequent words are common amongst the different
+complaint types, such as 'loan', 'account', 'payment'. 
+
+There are certain words that seem to be more unique such as 'student' for student loans,
+'home', 'escrow' for mortgage related complaints. 'Card' and 'credit' for card related.
+'Vehicle' and 'car' for vehicle loan related complaints. 
+
+
+Now let's build a model to classify complaints. Since I would like to incorporate 
+consumer narrative in the input, it would be best to use the dataset post omitting
+all na values. 
+
+
+Splitting data 
+```{R split data }
+set.seed(1234)
+
+multicomplaints_split <- initial_split(new_data, strata = Product)
+
+multicomplaints_train <- training(multicomplaints_split)
+multicomplaints_test <- testing(multicomplaints_split)
+
+```
+
+Display train data imbalance 
+```{R train data imbalance  }
+
+multicomplaints_train |>
+  count(Product, sort = TRUE) |> 
+  select(n, Product)
+```
+
+Display test data imbalance
+```{R test data imbalance}
+
+multicomplaints_test |>
+  count(Product, sort = TRUE) |> 
+  select(n, Product)
+```
+
+There is an imbalance in the product data, but the least popular product type, 
+student loan, still has about 7000 observations in the dataset, which maybe good 
+enough to train the model, so we'll hold off on downsampling the majority observation for now. 
+
+
+```{R }
+
+multicomplaints_rec <-
+  #modeling relationship between product type and narrative using train data
+  recipe(Product ~ `Consumer complaint narrative`, 
+         data = multicomplaints_train) |>
+  #tokenize consumer complaint narrative and keep only the 1st 1000 tokens
+  step_tokenize(`Consumer complaint narrative`) |>
+  step_stopwords(`Consumer complaint narrative`, stopword_source = 'snowball',
+                 custom_stopword_source = c("xx", "xxx", "xxxx"), keep = FALSE) |> 
+  step_tokenfilter(`Consumer complaint narrative`, max_tokens = 1e3) |>
+  step_tfidf(`Consumer complaint narrative`) #computes informativeness of each unique word 
+#based on its frequency in the text
+```
+
+```{R divide training set into 10 folds}
+multicomplaints_folds <- vfold_cv(multicomplaints_train)
+#separates training data into 10 folds
+```
+
+We're using a generalized linear model with family multinomial.
+```{R model spec }
+
+
+multi_spec <- multinom_reg(penalty = tune(), mixture = 1) |>
+  set_mode("classification") |>
+  set_engine("glmnet")
+
+multi_spec
+```
+
+```{R sparse}
+library(hardhat)
+sparse_bp <- default_recipe_blueprint(composition = "dgCMatrix")
+```
+
+```{R create workflow}
+
+multi_lasso_wf <- workflow() |>
+  add_recipe(multicomplaints_rec, blueprint = sparse_bp) |>
+  add_model(multi_spec)
+
+multi_lasso_wf
+
+```
+
+Since we don't know what a good penalty value is, we'll select range of values 
+from which we can choose the best after cross validation. 
+```{R penalty values}
+smaller_lambda <- grid_regular(penalty(range = c(-5, 0)), levels = 20)
+smaller_lambda
+
+```
+
+
+By default tuning produces accuracy as a model evaluation metric. 
+Let's examine how the model performs in terms of sensitivity and specificity as well.
+
+```{R tune grid}
+
+multi_lasso_rs <- tune_grid(
+  multi_lasso_wf,
+  multicomplaints_folds,
+  grid = smaller_lambda,
+  control = control_resamples(save_pred = TRUE),
+  metrics = metric_set(accuracy, sensitivity, specificity)
+)
+
+multi_lasso_rs
+
+```
+
+```{R sens_df }
+sens_df = as.data.frame(multi_lasso_rs$.metrics) |> filter(`.metric` == 'sens') 
+
+sens_df
+
+```
+Fit 
+
+```{R produce confusion matrix}
+multi_lasso_rs |>
+  collect_predictions() |>
+  filter(penalty == best_acc$penalty) |>
+  filter(id == "Fold01") |>
+  conf_mat(Product, .pred_class) |>
+  autoplot(type = "heatmap") +
+  scale_y_discrete(labels = function(x) str_wrap(x, 20)) +
+  scale_x_discrete(labels = function(x) str_wrap(x, 20))
+```
+All diagonal tiles are darker meaning the model performs pretty well.
+
+```{r plot metrics for different penalties}
+
+autoplot(multi_lasso_rs) +
+  labs(
+    color = "Number of tokens",
+    title = "Model performance across regularization penalties"
+  )
+
+```
+
+
+```{R display tibble row corresponding to best acc }
+best_acc <- multi_lasso_rs |>
+  show_best("accuracy")
+
+best_acc
+
+```
+
+Choose the penalty that gave the best accuracy to fit the entire training data.
+```{R choose acc}
+choose_acc <- multi_lasso_rs |>
+  select_by_pct_loss(metric = "accuracy", -penalty)
+
+choose_acc
+
+```
+
+```{r final workflow }
+
+final_wf <- finalize_workflow(multi_lasso_wf, choose_acc)
+final_wf
+```
+
+
+Get model metrics on test data. 
+```{R fit final data }
+
+final_fitted <- last_fit(final_wf, multicomplaints_split)
+
+collect_metrics(final_fitted)
+
+```
+
+Accuracy on final model is 0.929. 
+Area under ROC curve: 0.9859
+
+Sensitivity test: fit final data based on best sensitivity. 
+
+
+```{r final wf sens }
+
+final_wf_sens <- finalize_workflow(multi_lasso_wf, sens_df[6, ])
+#sens_df[6, ] corresponds to the penalty that gave best sensitivity 
+final_wf_sens
+```
+
+```{R final fitted sens }
+
+final_fitted_sens <- last_fit(final_wf_sens, multicomplaints_split)
+
+collect_metrics(final_fitted_sens)
+
+```
+
+
+ I solely used the consumer complaint narrative to classify the complaints 
+as I was curious to see how well a model performs only on the text data.
+
+However, this meant that I only used less than half the observations from the 
+original dataset since many of the complaints did not have a consumer narrative. 
+
+
+Using the text recipe package, I removed common, as well as custom stop words 
+such as 'xx', 'xxx' and 'xxxx'. 
+
+I used a multinomial generalized linear model with penalty in order to tackle 
+potential overfitting caused by the abundance of features 
+engineered from the narrative data. 
+
+My expectation was that the model would be 
+atleast 80% accurate in classifying complaints.
+
+I performed 10 fold cross validation to tune the penalty value based on 
+best accuracy. 
+
+Model performance on test data definitely exceeded it. 
+Final model accuracy was ~92%.  
+
+In order to perform sensitivity analysis, 
+I used the penalty value that corresponded with best sensitivity.
+
+Model accuracy performed in the sensitivity test was ~94%. AUC was also higher(~99%).
+
+This implies that there is room for improvement by tweaking the workflow while 
+retaining the same ML algorithm. 
+
+
+
