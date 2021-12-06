@@ -9,3 +9,7 @@ Different approaches to NLP and classification based on text data are described 
 
 The goal is to predict the type of product - i.e. Vehicle loan, credit card etc. based on the text complaint reported by the consumer.
 
+I've added the CSV file I downloaded with dates ranging from Nov - 1- 2018 to Nov -1 - 2021. 
+That is around 200K complaints for 4 different types of products. 
+
+I've also included the RMarkdown file for my final classification method. 
